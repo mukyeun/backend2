@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import styled, { css } from 'styled-components';
 import { 약물카테고리 } from '../data/MedicineCategories.js';
+import { 증상카테고리, 증상 } from '../data/SymptomCategories';
 
 // 스타일 컴포넌트들을 파일 상단에 모아서 선언
 const FormContainer = styled.div`
@@ -419,7 +420,7 @@ const BMIStatusLabel = styled.span`
 const personalityOptions = [
   '매우 급함',
   '급함',
-  '보통',
+  '원만',
   '느긋',
   '매우 느긋'
 ];
@@ -433,10 +434,10 @@ const levelOptions = [
   '매우 적음'
 ];
 
-// 기호식품 옵션 배열 추가 (컴포넌트 외부에 선언)
+// 기호식품 옵 배열 추가 (컴포넌트 외부에 선언)
 const favoriteItems = [
   '술',
-  '배',
+  '담배',
   '커피',
   '마약',
   '기타'
@@ -691,26 +692,119 @@ const getGenderFromResidentNumber = (number) => {
   return '';
 };
 
-function HealthInfoForm(props) {
-  const {
-    formData = {},
-    setFormData,
-    selectedSymptoms = [],
-    setSelectedSymptoms = () => {},
-    selectedCategory = {},
-    setSelectedCategory = () => {},
-    onSubmit = () => {},
-    onReset = () => {},
-    isValid = false,
-    validationErrors = {},
-    증상카테고리 = {}
-  } = props;
+function HealthInfoForm() {
+  // 모든 state를 먼저 선언
+  const [formData, setFormData] = useState({
+    기본정보: {
+      이름: '',
+      연락처: '',
+      주민등록번호: '',
+      성별: '',
+      신장: '',
+      체중: '',
+      성격: ''
+    },
+    증상선택: {
+      스트레스수준: '',
+      노동강도: '',
+      증상: []
+    },
+    맥파분석: {
+      수축기혈압: '',
+      이완기혈압: '',
+      맥박수: ''
+    },
+    복용약물: {
+      약물: [],
+      기호식품: []
+    },
+    메모: ''
+  });
 
+  const [selectedCategory, setSelectedCategory] = useState({
+    대분류: '',
+    중분류: '',
+    소분류: ''
+  });
+
+  // isValid state를 다른 state 선언 바로 뒤에 위치
+  const [isValid, setIsValid] = useState(false);
+
+  // useEffect를 state 선언 다음에 배치
   useEffect(() => {
-    if (!formData || !formData.기본정보) {
-      return;
+    const validateForm = () => {
+      const { 이름, 성별 } = formData.기본정보;
+      return Boolean(이름 && 성별); // 명시적으로 Boolean으로 변환
+    };
+    setIsValid(validateForm());
+  }, [formData.기본정보]); // 의존성 배열을 더 구체적으로 지정
+
+  // 카테고리 관련 변수들 정의
+  const 증상카테고리대분류 = Object.keys(증상카테고리);
+  
+  const 증상카테고리중분류 = selectedCategory.대분류 
+    ? Object.keys(증상카테고리[selectedCategory.대분류]) 
+    : [];
+  
+  const 증상카테고리소분류 = selectedCategory.중분류 
+    ? 증상[selectedCategory.중분류] || [] 
+    : [];
+
+  // 카테고리 선택 핸들러
+  const handleCategoryChange = (e, level) => {
+    const value = e.target.value;
+    setSelectedCategory(prev => {
+      const newCategory = { ...prev, [level]: value };
+      // 상위 카테고리가 변경되면 하위 카테고리 초기화
+      if (level === '대분류') {
+        newCategory.중분류 = '';
+        newCategory.소분류 = '';
+      } else if (level === '중분류') {
+        newCategory.소분류 = '';
+      }
+      return newCategory;
+    });
+  };
+
+  const onSubmit = useCallback(() => {
+    if (isValid) {
+      console.log('제출된 데이터:', formData);
     }
-  }, [formData]);
+  }, [formData, isValid]);
+
+  const onReset = useCallback(() => {
+    setFormData({
+      기본정보: {
+        이름: '',
+        연락처: '',
+        주민등록번호: '',
+        성별: '',
+        신장: '',
+        체중: '',
+        성격: ''
+      },
+      증상선택: {
+        스트레스수준: '',
+        노동강도: '',
+        증상: []
+      },
+      맥파분석: {
+        수축기혈압: '',
+        이완기혈압: '',
+        맥박수: ''
+      },
+      복용약물: {
+        약물: [],
+        기호식품: []
+      },
+      메모: ''
+    });
+    setSelectedCategory({
+      대분류: '',
+      중분류: '',
+      소분류: ''
+    });
+  }, []);
 
   // 증 제거 핸들러 추가
   const handleRemoveSymptom = (symptomToRemove) => {
@@ -718,7 +812,7 @@ function HealthInfoForm(props) {
       ...prev,
       증상선택: {
         ...prev.증상선택,
-        증상: prev.증상선택?.증상.filter(symptom => symptom !== symptomToRemove)
+        증상: prev.증상선택?.증상.filter(s => s !== symptomToRemove)
       }
     }));
   };
@@ -733,17 +827,6 @@ function HealthInfoForm(props) {
         ...prev.증상선택,
         증상: [...(prev.증상선택?.증상 || []), symptom]
       }
-    }));
-  };
-
-  // 카테고리 선택 핸들러
-  const handleCategoryChange = (e, level) => {
-    const { value } = e.target;
-    setSelectedCategory(prev => ({
-      ...prev,
-      [level]: value,
-      ...(level === '대분류' ? { 중분류: '', 소분류: '' } : {}),
-      ...(level === '중분류' ? { 소분류: '' } : {})
     }));
   };
 
@@ -847,7 +930,7 @@ function HealthInfoForm(props) {
     } else {
       setFormData(prev => ({
         ...prev,
-        [field]: value  // 메모와 같은 단일 필드는 직접 값 할당
+        [field]: value  // 메모와 같은 단일 필드는 접 값 할당
       }));
     }
   };
@@ -866,7 +949,7 @@ function HealthInfoForm(props) {
 
   // 기본정보 입력 처리 함수
   const handleBasicInfoChange = (e, field) => {
-    const value = e.target.value;
+    const { value } = e.target;
     setFormData(prev => ({
       ...prev,
       기본정보: {
@@ -890,7 +973,7 @@ function HealthInfoForm(props) {
 
   // 혈압/맥박 입력 처리 함수
   const handleVitalSignChange = (e, field) => {
-    const value = e.target.value;
+    const { value } = e.target;
     setFormData(prev => ({
       ...prev,
       맥파분석: {
@@ -1001,12 +1084,9 @@ function HealthInfoForm(props) {
               성격
               <RequiredLabel>*</RequiredLabel>
             </label>
-            <Select
-              name="성격"
+            <ModernSelect
               value={formData.기본정보?.성격 || ''}
-              onChange={(e) => handleInputChange(e, '성격')}
-              required
-              style={{ width: '200px' }}
+              onChange={(e) => handleBasicInfoChange(e, '성격')}
             >
               <option value="">선택하세요</option>
               {personalityOptions.map((option) => (
@@ -1014,7 +1094,7 @@ function HealthInfoForm(props) {
                   {option}
                 </option>
               ))}
-            </Select>
+            </ModernSelect>
           </FormGroup>
         </FormSection>
 
@@ -1058,45 +1138,43 @@ function HealthInfoForm(props) {
           <CategorySelectGrid>
             <CategoryFormGroup>
               <label>대분류</label>
-              <Select
-                value={selectedCategory.대분류 || ''}
+              <ModernSelect
+                value={selectedCategory.대분류}
                 onChange={(e) => handleCategoryChange(e, '대분류')}
               >
                 <option value="">선택하세요</option>
-                {Object.keys(증상카테고리).map(category => (
-                  <option key={category} value={category}>{category}</option>
+                {증상카테고리대분류.map(option => (
+                  <option key={option} value={option}>{option}</option>
                 ))}
-              </Select>
+              </ModernSelect>
             </CategoryFormGroup>
 
             <CategoryFormGroup>
               <label>중분류</label>
-              <Select
-                value={selectedCategory.중분류 || ''}
+              <ModernSelect
+                value={selectedCategory.중분류}
                 onChange={(e) => handleCategoryChange(e, '중분류')}
                 disabled={!selectedCategory.대분류}
               >
                 <option value="">선택하세요</option>
-                {selectedCategory.대분류 && 
-                  Object.keys(증상카테고리[selectedCategory.대분류] || {}).map(subCategory => (
-                    <option key={subCategory} value={subCategory}>{subCategory}</option>
-                  ))}
-              </Select>
+                {증상카테고리중분류.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </ModernSelect>
             </CategoryFormGroup>
 
             <CategoryFormGroup>
               <label>소분류</label>
-              <Select
-                value={selectedCategory.소분류 || ''}
+              <ModernSelect
+                value={selectedCategory.소분류}
                 onChange={(e) => handleCategoryChange(e, '소분류')}
                 disabled={!selectedCategory.중분류}
               >
                 <option value="">선택하세요</option>
-                {selectedCategory.중분류 && 
-                  (증상카테고리[selectedCategory.대분류]?.[selectedCategory.중분류] || []).map(symptom => (
-                    <option key={symptom} value={symptom}>{symptom}</option>
-                  ))}
-              </Select>
+                {증상카테고리소분류.map(option => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </ModernSelect>
             </CategoryFormGroup>
           </CategorySelectGrid>
 
@@ -1329,7 +1407,7 @@ const BMIStatus = styled.span`
       case '과도한 저체중': return '#ff6b6b';
       case '저체중': return '#ffd43b';
       case '정상': return '#51cf66';
-      case '과체중': return '#ffd43b';
+      case '과중': return '#ffd43b';
       case '비만': return '#ff922b';
       case '고도만': return '#ff6b6b';
       default: return '#868e96';
